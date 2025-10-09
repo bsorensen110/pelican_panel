@@ -22,22 +22,22 @@ use Filament\Auth\MultiFactor\Contracts\MultiFactorAuthenticationProvider;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
-use Filament\Schemas\Components\Grid;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Forms\Components\Repeater;
-use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\StateCasts\BooleanStateCast;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
-use Filament\Schemas\Components\Utilities\Get;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\StateCasts\BooleanStateCast;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
@@ -48,6 +48,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Socialite\Facades\Socialite;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * @method User getUser()
@@ -90,16 +91,14 @@ class EditProfile extends BaseEditProfile
                     ->schema([
                         Tab::make('account')
                             ->label(trans('profile.tabs.account'))
-                            ->icon('tabler-user')
+                            ->icon('tabler-user-cog')
                             ->schema([
                                 TextInput::make('username')
+                                    ->prefixIcon('tabler-user')
                                     ->label(trans('profile.username'))
-                                    ->disabled()
-                                    ->readOnly()
-                                    ->dehydrated(false)
+                                    ->required()
                                     ->maxLength(255)
-                                    ->unique()
-                                    ->autofocus(),
+                                    ->unique(),
                                 TextInput::make('email')
                                     ->prefixIcon('tabler-mail')
                                     ->label(trans('profile.email'))
@@ -114,8 +113,8 @@ class EditProfile extends BaseEditProfile
                                     ->revealable(filament()->arePasswordsRevealable())
                                     ->rule(Password::default())
                                     ->autocomplete('new-password')
-                                    ->dehydrated(fn ($state): bool => filled($state))
-                                    ->dehydrateStateUsing(fn ($state): string => Hash::make($state))
+                                    ->dehydrated(fn ($state) => filled($state))
+                                    ->dehydrateStateUsing(fn ($state) => Hash::make($state))
                                     ->live(debounce: 500)
                                     ->same('passwordConfirmation'),
                                 TextInput::make('passwordConfirmation')
@@ -124,13 +123,13 @@ class EditProfile extends BaseEditProfile
                                     ->prefixIcon('tabler-password-fingerprint')
                                     ->revealable(filament()->arePasswordsRevealable())
                                     ->required()
-                                    ->visible(fn (Get $get): bool => filled($get('password')))
+                                    ->visible(fn (Get $get) => filled($get('password')))
                                     ->dehydrated(false),
                                 Select::make('timezone')
                                     ->label(trans('profile.timezone'))
                                     ->required()
                                     ->prefixIcon('tabler-clock-pin')
-                                    ->default('UTC')
+                                    ->default(config('app.timezone', 'UTC'))
                                     ->selectablePlaceholder(false)
                                     ->options(fn () => collect(DateTimeZone::listIdentifiers())->mapWithKeys(fn ($tz) => [$tz => $tz]))
                                     ->searchable()
@@ -153,14 +152,20 @@ class EditProfile extends BaseEditProfile
                                     ->directory('avatars')
                                     ->disk('public')
                                     ->getUploadedFileNameForStorageUsing(fn () => $this->getUser()->id . '.png')
-                                    ->hintAction(function (FileUpload $fileUpload) {
+                                    ->formatStateUsing(function (FileUpload $fileUpload) {
                                         $path = $fileUpload->getDirectory() . '/' . $this->getUser()->id . '.png';
+                                        if ($fileUpload->getDisk()->exists($path)) {
+                                            return $path;
+                                        }
+                                    })
+                                    ->deleteUploadedFileUsing(function (FileUpload $fileUpload, $file) {
+                                        if ($file instanceof TemporaryUploadedFile) {
+                                            return $file->delete();
+                                        }
 
-                                        return Action::make('remove_avatar')
-                                            ->icon('tabler-photo-minus')
-                                            ->iconButton()
-                                            ->hidden(fn () => !$fileUpload->getDisk()->exists($path))
-                                            ->action(fn () => $fileUpload->getDisk()->delete($path));
+                                        if ($fileUpload->getDisk()->exists($file)) {
+                                            return $fileUpload->getDisk()->delete($file);
+                                        }
                                     }),
                             ]),
                         Tab::make('oauth')
@@ -183,10 +188,10 @@ class EditProfile extends BaseEditProfile
                                         ->color(Color::hex($schema->getHexColor()))
                                         ->action(function (UserUpdateService $updateService) use ($id, $name, $unlink) {
                                             if ($unlink) {
-                                                $oauth = auth()->user()->oauth;
+                                                $oauth = user()?->oauth;
                                                 unset($oauth[$id]);
 
-                                                $updateService->handle(auth()->user(), ['oauth' => $oauth]);
+                                                $updateService->handle(user(), ['oauth' => $oauth]);
 
                                                 $this->fillForm();
 
@@ -294,7 +299,13 @@ class EditProfile extends BaseEditProfile
                                                         TextEntry::make('memo')
                                                             ->hiddenLabel()
                                                             ->state(fn (ApiKey $key) => $key->memo),
-                                                    ]),
+                                                    ])
+                                                    ->visible(fn (User $user) => $user->apiKeys()->exists()),
+
+                                                TextEntry::make('no_api_keys')
+                                                    ->state(trans('profile.no_api_keys'))
+                                                    ->hiddenLabel()
+                                                    ->visible(fn (User $user) => !$user->apiKeys()->exists()),
                                             ]),
                                     ]),
                             ]),
@@ -383,7 +394,13 @@ class EditProfile extends BaseEditProfile
                                                     TextEntry::make('fingerprint')
                                                         ->hiddenLabel()
                                                         ->state(fn (UserSSHKey $key) => "SHA256:{$key->fingerprint}"),
-                                                ]),
+                                                ])
+                                                ->visible(fn (User $user) => $user->sshKeys()->exists()),
+
+                                            TextEntry::make('no_ssh_keys')
+                                                ->state(trans('profile.no_ssh_keys'))
+                                                ->hiddenLabel()
+                                                ->visible(fn (User $user) => !$user->sshKeys()->exists()),
                                         ]),
                                 ]),
                             ]),

@@ -8,8 +8,8 @@ use App\Services\Databases\DatabaseManagementService;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Set;
 
 class RotateDatabasePasswordAction extends Action
 {
@@ -26,7 +26,7 @@ class RotateDatabasePasswordAction extends Action
 
         $this->icon('tabler-refresh');
 
-        $this->authorize(fn (Database $database) => auth()->user()->can('update', $database));
+        $this->authorize(fn (Database $database) => user()?->can('update', $database));
 
         $this->modalHeading(trans('admin/databasehost.rotate_password'));
 
@@ -56,7 +56,7 @@ class RotateDatabasePasswordAction extends Action
             } catch (Exception $exception) {
                 Notification::make()
                     ->title(trans('admin/databasehost.rotate_error'))
-                    ->body(fn () => auth()->user()->canAccessPanel(Filament::getPanel('admin')) ? $exception->getMessage() : null)
+                    ->body(fn () => user()?->canAccessPanel(Filament::getPanel('admin')) ? $exception->getMessage() : null)
                     ->danger()
                     ->send();
 

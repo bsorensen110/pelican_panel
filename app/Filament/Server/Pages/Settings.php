@@ -8,12 +8,12 @@ use App\Models\Server;
 use App\Services\Servers\ReinstallServerService;
 use Exception;
 use Filament\Actions\Action;
-use Filament\Schemas\Components\Fieldset;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 
@@ -51,7 +51,7 @@ class Settings extends ServerFormPage
                             ->schema([
                                 TextInput::make('name')
                                     ->label(trans('server/setting.server_info.name'))
-                                    ->disabled(fn (Server $server) => !auth()->user()->can(Permission::ACTION_SETTINGS_RENAME, $server))
+                                    ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_SETTINGS_RENAME, $server))
                                     ->required()
                                     ->columnSpan([
                                         'default' => 1,
@@ -64,7 +64,7 @@ class Settings extends ServerFormPage
                                 Textarea::make('description')
                                     ->label(trans('server/setting.server_info.description'))
                                     ->hidden(!config('panel.editable_server_descriptions'))
-                                    ->disabled(fn (Server $server) => !auth()->user()->can(Permission::ACTION_SETTINGS_RENAME, $server))
+                                    ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_SETTINGS_RENAME, $server))
                                     ->columnSpan([
                                         'default' => 1,
                                         'sm' => 2,
@@ -83,8 +83,8 @@ class Settings extends ServerFormPage
                                         'lg' => 4,
                                     ])
                                     ->disabled(),
-                                TextInput::make('id')
-                                    ->label(trans('server/setting.server_info.id'))
+                                TextInput::make('uuid_short')
+                                    ->label(trans('server/setting.server_info.uuid_short'))
                                     ->disabled()
                                     ->columnSpan(1),
                                 TextInput::make('node.name')
@@ -153,7 +153,7 @@ class Settings extends ServerFormPage
                             ]),
                         Fieldset::make(trans('server/setting.server_info.sftp.title'))
                             ->columnSpanFull()
-                            ->hidden(fn (Server $server) => !auth()->user()->can(Permission::ACTION_FILE_SFTP, $server))
+                            ->hidden(fn (Server $server) => !user()?->can(Permission::ACTION_FILE_SFTP, $server))
                             ->columns([
                                 'default' => 1,
                                 'sm' => 1,
@@ -165,7 +165,7 @@ class Settings extends ServerFormPage
                                     ->label(trans('server/setting.server_info.sftp.connection'))
                                     ->columnSpan(1)
                                     ->disabled()
-                                    ->copyable(fn () => request()->isSecure())
+                                    ->copyable()
                                     ->hintAction(
                                         Action::make('connect_sftp')
                                             ->label(trans('server/setting.server_info.sftp.action'))
@@ -174,40 +174,40 @@ class Settings extends ServerFormPage
                                             ->url(function (Server $server) {
                                                 $fqdn = $server->node->daemon_sftp_alias ?? $server->node->fqdn;
 
-                                                return 'sftp://' . auth()->user()->username . '.' . $server->uuid_short . '@' . $fqdn . ':' . $server->node->daemon_sftp;
+                                                return 'sftp://' . rawurlencode(user()?->username) . '.' . $server->uuid_short . '@' . $fqdn . ':' . $server->node->daemon_sftp;
                                             }),
                                     )
                                     ->formatStateUsing(function (Server $server) {
                                         $fqdn = $server->node->daemon_sftp_alias ?? $server->node->fqdn;
 
-                                        return 'sftp://' . auth()->user()->username . '.' . $server->uuid_short . '@' . $fqdn . ':' . $server->node->daemon_sftp;
+                                        return 'sftp://' . rawurlencode(user()?->username) . '.' . $server->uuid_short . '@' . $fqdn . ':' . $server->node->daemon_sftp;
                                     }),
                                 TextInput::make('username')
                                     ->label(trans('server/setting.server_info.sftp.username'))
                                     ->columnSpan(1)
-                                    ->copyable(fn () => request()->isSecure())
+                                    ->copyable()
                                     ->disabled()
-                                    ->formatStateUsing(fn (Server $server) => auth()->user()->username . '.' . $server->uuid_short),
+                                    ->formatStateUsing(fn (Server $server) => user()?->username . '.' . $server->uuid_short),
                                 TextEntry::make('password')
                                     ->label(trans('server/setting.server_info.sftp.password'))
                                     ->columnSpan(1)
-                                    ->label(trans('server/setting.server_info.sftp.password_body')),
+                                    ->state(trans('server/setting.server_info.sftp.password_body')),
                             ]),
                     ]),
                 Section::make(trans('server/setting.reinstall.title'))
-                    ->hidden(fn (Server $server) => !auth()->user()->can(Permission::ACTION_SETTINGS_REINSTALL, $server))
+                    ->hidden(fn (Server $server) => !user()?->can(Permission::ACTION_SETTINGS_REINSTALL, $server))
                     ->columnSpanFull()
                     ->footerActions([
                         Action::make('reinstall')
                             ->label(trans('server/setting.reinstall.action'))
                             ->color('danger')
-                            ->disabled(fn (Server $server) => !auth()->user()->can(Permission::ACTION_SETTINGS_REINSTALL, $server))
+                            ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_SETTINGS_REINSTALL, $server))
                             ->requiresConfirmation()
                             ->modalHeading(trans('server/setting.reinstall.modal'))
                             ->modalDescription(trans('server/setting.reinstall.modal_description'))
                             ->modalSubmitActionLabel(trans('server/setting.reinstall.yes'))
                             ->action(function (Server $server, ReinstallServerService $reinstallService) {
-                                abort_unless(auth()->user()->can(Permission::ACTION_SETTINGS_REINSTALL, $server), 403);
+                                abort_unless(user()?->can(Permission::ACTION_SETTINGS_REINSTALL, $server), 403);
 
                                 try {
                                     $reinstallService->handle($server);
@@ -246,7 +246,7 @@ class Settings extends ServerFormPage
 
     public function updateName(string $name, Server $server): void
     {
-        abort_unless(auth()->user()->can(Permission::ACTION_SETTINGS_RENAME, $server), 403);
+        abort_unless(user()?->can(Permission::ACTION_SETTINGS_RENAME, $server), 403);
 
         $original = $server->name;
 
@@ -277,7 +277,7 @@ class Settings extends ServerFormPage
 
     public function updateDescription(string $description, Server $server): void
     {
-        abort_unless(auth()->user()->can(Permission::ACTION_SETTINGS_RENAME, $server) && config('panel.editable_server_descriptions'), 403);
+        abort_unless(user()?->can(Permission::ACTION_SETTINGS_RENAME, $server) && config('panel.editable_server_descriptions'), 403);
 
         $original = $server->description;
 

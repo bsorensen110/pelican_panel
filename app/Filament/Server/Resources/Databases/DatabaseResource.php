@@ -3,8 +3,8 @@
 namespace App\Filament\Server\Resources\Databases;
 
 use App\Filament\Components\Actions\RotateDatabasePasswordAction;
-use App\Filament\Server\Resources\Databases\Pages\ListDatabases;
 use App\Filament\Components\Tables\Columns\DateTimeColumn;
+use App\Filament\Server\Resources\Databases\Pages\ListDatabases;
 use App\Models\Database;
 use App\Models\DatabaseHost;
 use App\Models\Permission;
@@ -78,22 +78,22 @@ class DatabaseResource extends Resource
                 TextInput::make('host')
                     ->label(trans('server/database.host'))
                     ->formatStateUsing(fn (Database $database) => $database->address())
-                    ->copyable(fn () => request()->isSecure()),
+                    ->copyable(),
                 TextInput::make('database')
                     ->label(trans('server/database.database'))
-                    ->copyable(fn () => request()->isSecure()),
+                    ->copyable(),
                 TextInput::make('username')
                     ->label(trans('server/database.username'))
-                    ->copyable(fn () => request()->isSecure()),
+                    ->copyable(),
                 TextInput::make('password')
                     ->label(trans('server/database.password'))
                     ->password()->revealable()
-                    ->hidden(fn () => !auth()->user()->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
+                    ->hidden(fn () => !user()?->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
                     ->hintAction(
                         RotateDatabasePasswordAction::make()
-                            ->authorize(fn () => auth()->user()->can(Permission::ACTION_DATABASE_UPDATE, $server))
+                            ->authorize(fn () => user()?->can(Permission::ACTION_DATABASE_UPDATE, $server))
                     )
-                    ->copyable(fn () => request()->isSecure())
+                    ->copyable()
                     ->formatStateUsing(fn (Database $database) => $database->password),
                 TextInput::make('remote')
                     ->label(trans('server/database.remote')),
@@ -103,8 +103,8 @@ class DatabaseResource extends Resource
                 TextInput::make('jdbc')
                     ->label(trans('server/database.jdbc'))
                     ->password()->revealable()
-                    ->hidden(!auth()->user()->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
-                    ->copyable(fn () => request()->isSecure())
+                    ->hidden(!user()?->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
+                    ->copyable()
                     ->columnSpanFull()
                     ->formatStateUsing(fn (Database $database) => $database->jdbc),
             ]);
@@ -210,27 +210,27 @@ class DatabaseResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->can(Permission::ACTION_DATABASE_READ, Filament::getTenant());
+        return user()?->can(Permission::ACTION_DATABASE_READ, Filament::getTenant());
     }
 
     public static function canView(Model $record): bool
     {
-        return auth()->user()->can(Permission::ACTION_DATABASE_READ, Filament::getTenant());
+        return user()?->can(Permission::ACTION_DATABASE_READ, Filament::getTenant());
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()->can(Permission::ACTION_DATABASE_CREATE, Filament::getTenant());
+        return user()?->can(Permission::ACTION_DATABASE_CREATE, Filament::getTenant());
     }
 
     public static function canEdit(Model $record): bool
     {
-        return auth()->user()->can(Permission::ACTION_DATABASE_UPDATE, Filament::getTenant());
+        return user()?->can(Permission::ACTION_DATABASE_UPDATE, Filament::getTenant());
     }
 
     public static function canDelete(Model $record): bool
     {
-        return auth()->user()->can(Permission::ACTION_DATABASE_DELETE, Filament::getTenant());
+        return user()?->can(Permission::ACTION_DATABASE_DELETE, Filament::getTenant());
     }
 
     /** @return array<string, PageRegistration> */

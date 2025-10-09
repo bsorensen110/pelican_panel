@@ -3,15 +3,15 @@
 namespace App\Filament\Admin\Resources\Servers;
 
 use App\Enums\CustomizationKey;
-use App\Filament\Admin\Resources\Servers\RelationManagers\AllocationsRelationManager;
-use App\Filament\Admin\Resources\Servers\Pages\ListServers;
 use App\Filament\Admin\Resources\Servers\Pages\CreateServer;
 use App\Filament\Admin\Resources\Servers\Pages\EditServer;
-use Exception;
+use App\Filament\Admin\Resources\Servers\Pages\ListServers;
+use App\Filament\Admin\Resources\Servers\RelationManagers\AllocationsRelationManager;
 use App\Models\Mount;
 use App\Models\Server;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
+use Exception;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -47,7 +47,7 @@ class ServerResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return auth()->user()->getCustomization(CustomizationKey::TopNavigation) ? false : trans('admin/dashboard.server');
+        return user()?->getCustomization(CustomizationKey::TopNavigation) ? false : trans('admin/dashboard.server');
     }
 
     public static function getNavigationBadge(): ?string
@@ -103,6 +103,6 @@ class ServerResource extends Resource
     {
         $query = parent::getEloquentQuery();
 
-        return $query->whereIn('node_id', auth()->user()->accessibleNodes()->pluck('id'));
+        return $query->whereIn('node_id', user()?->accessibleNodes()->pluck('id'));
     }
 }

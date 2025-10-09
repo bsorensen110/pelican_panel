@@ -16,31 +16,31 @@ use App\Traits\Filament\CanCustomizeHeaderActions;
 use App\Traits\Filament\CanCustomizeHeaderWidgets;
 use Exception;
 use Filament\Actions\Action;
-use Filament\Schemas\Components\Fieldset;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\KeyValue;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\CreateRecord;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
-use Filament\Notifications\Notification;
-use Filament\Resources\Pages\CreateRecord;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
+use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 use LogicException;
-use Filament\Schemas\Schema;
 use Random\RandomException;
 
 class CreateServer extends CreateRecord
@@ -117,7 +117,7 @@ class CreateServer extends CreateRecord
                                 ->selectablePlaceholder(false)
                                 ->default(function () {
                                     /** @var ?Node $latestNode */
-                                    $latestNode = auth()->user()->accessibleNodes()->latest()->first();
+                                    $latestNode = user()?->accessibleNodes()->latest()->first();
                                     $this->node = $latestNode;
 
                                     return $this->node?->id;
@@ -128,7 +128,7 @@ class CreateServer extends CreateRecord
                                     'md' => 2,
                                 ])
                                 ->live()
-                                ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', auth()->user()->accessibleNodes()->pluck('id')))
+                                ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', user()?->accessibleNodes()->pluck('id')))
                                 ->searchable()
                                 ->required()
                                 ->preload()
@@ -141,7 +141,7 @@ class CreateServer extends CreateRecord
                                 ->preload()
                                 ->prefixIcon('tabler-user')
                                 ->selectablePlaceholder(false)
-                                ->default(auth()->user()->id)
+                                ->default(user()?->id)
                                 ->label(trans('admin/server.owner'))
                                 ->columnSpan([
                                     'default' => 1,
@@ -151,7 +151,7 @@ class CreateServer extends CreateRecord
                                 ->relationship('user', 'username')
                                 ->searchable(['username', 'email'])
                                 ->getOptionLabelFromRecordUsing(fn (User $user) => "$user->username ($user->email)")
-                                ->createOptionAction(fn (Action $action) => $action->authorize(fn () => auth()->user()->can('create', User::class)))
+                                ->createOptionAction(fn (Action $action) => $action->authorize(fn () => user()?->can('create', User::class)))
                                 ->createOptionForm([
                                     TextInput::make('username')
                                         ->label(trans('admin/user.username'))
@@ -212,18 +212,27 @@ class CreateServer extends CreateRecord
                                         ->where('node_id', $get('node_id'))
                                         ->whereNull('server_id'),
                                 )
-                                ->createOptionAction(fn (Action $action) => $action->authorize(fn (Get $get) => auth()->user()->can('create', Node::find($get('node_id')))))
+                                ->createOptionAction(fn (Action $action) => $action->authorize(fn (Get $get) => user()?->can('create', Node::find($get('node_id')))))
                                 ->createOptionForm(function (Get $get) {
                                     $getPage = $get;
 
                                     return [
                                         Select::make('allocation_ip')
-                                            ->options(collect(Node::find($get('node_id'))?->ipAddresses())->mapWithKeys(fn (string $ip) => [$ip => $ip]))
+                                            ->options(fn () => collect(Node::find($get('node_id'))?->ipAddresses())->mapWithKeys(fn (string $ip) => [$ip => $ip]))
                                             ->label(trans('admin/server.ip_address'))->inlineLabel()
                                             ->helperText(trans('admin/server.ip_address_helper'))
                                             ->afterStateUpdated(fn (Set $set) => $set('allocation_ports', []))
                                             ->ip()
                                             ->live()
+                                            ->hintAction(
+                                                Action::make('refresh')
+                                                    ->iconButton()
+                                                    ->icon('tabler-refresh')
+                                                    ->tooltip(trans('admin/node.refresh'))
+                                                    ->action(function () use ($get) {
+                                                        cache()->forget("nodes.{$get('node_id')}.ips");
+                                                    })
+                                            )
                                             ->required(),
                                         TextInput::make('allocation_alias')
                                             ->label(trans('admin/server.alias'))->inlineLabel()
@@ -319,7 +328,7 @@ class CreateServer extends CreateRecord
                                 ->live()
                                 ->afterStateUpdated(function ($state, Set $set, Get $get, $old) {
                                     $egg = Egg::query()->find($state);
-                                    $set('startup', $egg->startup ?? '');
+                                    $set('startup', '');
                                     $set('image', '');
 
                                     $variables = $egg->variables ?? [];
@@ -393,24 +402,45 @@ class CreateServer extends CreateRecord
                                 ])
                                 ->inline(),
 
-                            Textarea::make('startup')
-                                ->hintIcon('tabler-code')
+                            Select::make('select_startup')
                                 ->label(trans('admin/server.startup_cmd'))
+                                ->hidden(fn (Get $get) => $get('egg_id') === null)
+                                ->live()
+                                ->afterStateUpdated(fn (Set $set, $state) => $set('startup', $state))
+                                ->options(function ($state, Get $get, Set $set) {
+                                    $egg = Egg::query()->find($get('egg_id'));
+                                    $startups = $egg->startup_commands ?? [];
+
+                                    $currentStartup = $get('startup');
+                                    if (!$currentStartup && $startups) {
+                                        $currentStartup = collect($startups)->first();
+                                        $set('startup', $currentStartup);
+                                        $set('select_startup', $currentStartup);
+                                    }
+
+                                    return array_flip($startups) + ['' => 'Custom Startup'];
+                                })
+                                ->selectablePlaceholder(false)
+                                ->columnSpanFull(),
+
+                            Textarea::make('startup')
+                                ->hiddenLabel()
                                 ->hidden(fn (Get $get) => $get('egg_id') === null)
                                 ->required()
                                 ->live()
-                                ->rows(function ($state) {
-                                    return str($state)->explode("\n")->reduce(
-                                        fn (int $carry, $line) => $carry + floor(strlen($line) / 125),
-                                        1
-                                    );
+                                ->autosize()
+                                ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                    $egg = Egg::query()->find($get('egg_id'));
+                                    $startups = $egg->startup_commands ?? [];
+
+                                    if (in_array($state, $startups)) {
+                                        $set('select_startup', $state);
+                                    } else {
+                                        $set('select_startup', '');
+                                    }
                                 })
-                                ->columnSpan([
-                                    'default' => 1,
-                                    'sm' => 4,
-                                    'md' => 4,
-                                    'lg' => 6,
-                                ]),
+                                ->placeholder(trans('admin/server.startup_placeholder'))
+                                ->columnSpanFull(),
 
                             Hidden::make('environment')->default([]),
 

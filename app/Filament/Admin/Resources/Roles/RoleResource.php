@@ -3,24 +3,23 @@
 namespace App\Filament\Admin\Resources\Roles;
 
 use App\Enums\CustomizationKey;
-use App\Filament\Admin\Resources\Roles\Pages\ListRoles;
 use App\Filament\Admin\Resources\Roles\Pages\CreateRole;
-use App\Filament\Admin\Resources\Roles\Pages\ViewRole;
 use App\Filament\Admin\Resources\Roles\Pages\EditRole;
-use BackedEnum;
+use App\Filament\Admin\Resources\Roles\Pages\ListRoles;
+use App\Filament\Admin\Resources\Roles\Pages\ViewRole;
 use App\Models\Role;
+use App\Traits\Filament\CanCustomizePages;
+use App\Traits\Filament\CanCustomizeRelations;
+use App\Traits\Filament\CanModifyForm;
+use App\Traits\Filament\CanModifyTable;
+use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use App\Traits\Filament\CanCustomizePages;
-use App\Traits\Filament\CanCustomizeRelations;
-use App\Traits\Filament\CanModifyForm;
-use App\Traits\Filament\CanModifyTable;
 use Filament\Forms\Components\CheckboxList;
-use Filament\Schemas\Schema;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -30,6 +29,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
@@ -65,7 +65,7 @@ class RoleResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return auth()->user()->getCustomization(CustomizationKey::TopNavigation) ? trans('admin/dashboard.advanced') : trans('admin/dashboard.user');
+        return user()?->getCustomization(CustomizationKey::TopNavigation) ? trans('admin/dashboard.advanced') : trans('admin/dashboard.user');
     }
 
     public static function getNavigationBadge(): ?string

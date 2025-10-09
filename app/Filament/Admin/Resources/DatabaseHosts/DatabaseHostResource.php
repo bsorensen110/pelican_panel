@@ -2,11 +2,11 @@
 
 namespace App\Filament\Admin\Resources\DatabaseHosts;
 
-use App\Filament\Admin\Resources\DatabaseHosts\RelationManagers\DatabasesRelationManager;
-use App\Filament\Admin\Resources\DatabaseHosts\Pages\ListDatabaseHosts;
 use App\Filament\Admin\Resources\DatabaseHosts\Pages\CreateDatabaseHost;
-use App\Filament\Admin\Resources\DatabaseHosts\Pages\ViewDatabaseHost;
 use App\Filament\Admin\Resources\DatabaseHosts\Pages\EditDatabaseHost;
+use App\Filament\Admin\Resources\DatabaseHosts\Pages\ListDatabaseHosts;
+use App\Filament\Admin\Resources\DatabaseHosts\Pages\ViewDatabaseHost;
+use App\Filament\Admin\Resources\DatabaseHosts\RelationManagers\DatabasesRelationManager;
 use App\Models\DatabaseHost;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
@@ -166,7 +166,7 @@ class DatabaseHostResource extends Resource
                             ->preload()
                             ->helperText(trans('admin/databasehost.linked_nodes_help'))
                             ->label(trans('admin/databasehost.linked_nodes'))
-                            ->relationship('nodes', 'name', fn (Builder $query) => $query->whereIn('nodes.id', auth()->user()->accessibleNodes()->pluck('id'))),
+                            ->relationship('nodes', 'name', fn (Builder $query) => $query->whereIn('nodes.id', user()?->accessibleNodes()->pluck('id'))),
                     ]),
             ]);
     }
@@ -196,7 +196,7 @@ class DatabaseHostResource extends Resource
 
         return $query->where(function (Builder $query) {
             return $query->whereHas('nodes', function (Builder $query) {
-                $query->whereIn('nodes.id', auth()->user()->accessibleNodes()->pluck('id'));
+                $query->whereIn('nodes.id', user()?->accessibleNodes()->pluck('id'));
             })->orDoesntHave('nodes');
         });
     }

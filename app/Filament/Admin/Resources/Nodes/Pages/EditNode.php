@@ -2,11 +2,6 @@
 
 namespace App\Filament\Admin\Resources\Nodes\Pages;
 
-use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
-use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\Grid;
-use Throwable;
 use App\Filament\Admin\Resources\Nodes\NodeResource;
 use App\Models\Node;
 use App\Repositories\Daemon\DaemonConfigurationRepository;
@@ -16,25 +11,32 @@ use App\Services\Nodes\NodeUpdateService;
 use App\Traits\Filament\CanCustomizeHeaderActions;
 use App\Traits\Filament\CanCustomizeHeaderWidgets;
 use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Infolists\Components\CodeEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\EditRecord;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\StateCasts\BooleanStateCast;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
-use Filament\Notifications\Notification;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Schemas\Components\StateCasts\BooleanStateCast;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\HtmlString;
+use Phiki\Grammar\Grammar;
+use Throwable;
 
 class EditNode extends EditRecord
 {
@@ -547,11 +549,12 @@ class EditNode extends EditRecord
                                 ->label(trans('admin/node.instructions'))
                                 ->columnSpanFull()
                                 ->state(new HtmlString(trans('admin/node.instructions_help'))),
-                            Textarea::make('config')
+                            CodeEntry::make('config')
                                 ->label('/etc/pelican/config.yml')
+                                ->grammar(Grammar::Yaml)
+                                ->state(fn (Node $node) => $node->getYamlConfiguration())
+                                ->copyable()
                                 ->disabled()
-                                ->rows(19)
-                                ->hintCopy()
                                 ->columnSpanFull(),
                             Grid::make()
                                 ->columns()
@@ -628,8 +631,6 @@ class EditNode extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $node = Node::findOrFail($data['id']);
-
-        $data['config'] = $node->getYamlConfiguration();
 
         if (!is_ip($node->fqdn)) {
             $ip = get_ip_from_hostname($node->fqdn);

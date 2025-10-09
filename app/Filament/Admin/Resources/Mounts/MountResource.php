@@ -2,16 +2,16 @@
 
 namespace App\Filament\Admin\Resources\Mounts;
 
-use App\Filament\Admin\Resources\Mounts\Pages\ListMounts;
 use App\Filament\Admin\Resources\Mounts\Pages\CreateMount;
-use App\Filament\Admin\Resources\Mounts\Pages\ViewMount;
 use App\Filament\Admin\Resources\Mounts\Pages\EditMount;
-use Exception;
+use App\Filament\Admin\Resources\Mounts\Pages\ListMounts;
+use App\Filament\Admin\Resources\Mounts\Pages\ViewMount;
 use App\Models\Mount;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
 use App\Traits\Filament\CanModifyForm;
 use App\Traits\Filament\CanModifyTable;
+use Exception;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -166,7 +166,7 @@ class MountResource extends Resource
                             ->preload(),
                         Select::make('nodes')->multiple()
                             ->label(trans('admin/mount.nodes'))
-                            ->relationship('nodes', 'name', fn (Builder $query) => $query->whereIn('nodes.id', auth()->user()->accessibleNodes()->pluck('id')))
+                            ->relationship('nodes', 'name', fn (Builder $query) => $query->whereIn('nodes.id', user()?->accessibleNodes()->pluck('id')))
                             ->searchable(['name', 'fqdn'])
                             ->preload(),
                     ]),
@@ -197,7 +197,7 @@ class MountResource extends Resource
 
         return $query->where(function (Builder $query) {
             return $query->whereHas('nodes', function (Builder $query) {
-                $query->whereIn('nodes.id', auth()->user()->accessibleNodes()->pluck('id'));
+                $query->whereIn('nodes.id', user()?->accessibleNodes()->pluck('id'));
             })->orDoesntHave('nodes');
         });
     }

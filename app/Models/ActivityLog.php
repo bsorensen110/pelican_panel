@@ -2,23 +2,23 @@
 
 namespace App\Models;
 
-use LogicException;
-use Illuminate\Support\Collection;
+use App\Events\ActivityLogged;
 use App\Traits\HasValidation;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Event;
-use App\Events\ActivityLogged;
 use Filament\Facades\Filament;
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
+use LogicException;
 
 /**
  * \App\Models\ActivityLog.
@@ -163,6 +163,11 @@ class ActivityLog extends Model implements HasIcon, HasLabel
         return trans_choice('activity.'.str($this->event)->replace(':', '.'), array_key_exists('count', $properties) ? $properties['count'] : 1, $properties);
     }
 
+    public function getIp(): ?string
+    {
+        return auth()->user()->can('seeIps activityLog') ? $this->ip : null;
+    }
+
     public function htmlable(): string
     {
         $user = $this->actor;
@@ -175,6 +180,8 @@ class ActivityLog extends Model implements HasIcon, HasLabel
 
         $avatarUrl = Filament::getUserAvatarUrl($user);
         $username = str($user->username)->stripTags();
+        $ip = $this->getIp();
+        $ip = $ip ? $ip . ' — ' : '';
 
         return "
             <div style='display: flex; align-items: center;'>
@@ -183,7 +190,7 @@ class ActivityLog extends Model implements HasIcon, HasLabel
                 <div>
                     <p>$username — $this->event</p>
                     <p>{$this->getLabel()}</p>
-                    <p>$this->ip — <span title='{$this->timestamp->format('M j, Y g:ia')}'>{$this->timestamp->diffForHumans()}</span></p>
+                    <p>$ip<span title='{$this->timestamp->format('M j, Y g:ia')}'>{$this->timestamp->diffForHumans()}</span></p>
                 </div>
             </div>
         ";

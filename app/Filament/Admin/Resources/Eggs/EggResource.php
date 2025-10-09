@@ -3,10 +3,10 @@
 namespace App\Filament\Admin\Resources\Eggs;
 
 use App\Enums\CustomizationKey;
-use App\Filament\Admin\Resources\Eggs\RelationManagers\ServersRelationManager;
-use App\Filament\Admin\Resources\Eggs\Pages\ListEggs;
 use App\Filament\Admin\Resources\Eggs\Pages\CreateEgg;
 use App\Filament\Admin\Resources\Eggs\Pages\EditEgg;
+use App\Filament\Admin\Resources\Eggs\Pages\ListEggs;
+use App\Filament\Admin\Resources\Eggs\RelationManagers\ServersRelationManager;
 use App\Models\Egg;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
@@ -32,7 +32,7 @@ class EggResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return auth()->user()->getCustomization(CustomizationKey::TopNavigation) ? false : trans('admin/dashboard.server');
+        return user()?->getCustomization(CustomizationKey::TopNavigation) ? false : trans('admin/dashboard.server');
     }
 
     public static function getNavigationLabel(): string

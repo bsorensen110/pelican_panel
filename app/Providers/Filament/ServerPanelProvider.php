@@ -2,8 +2,8 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\App\Resources\Servers\Pages\ListServers;
 use App\Filament\Admin\Resources\Servers\Pages\EditServer;
+use App\Filament\App\Resources\Servers\Pages\ListServers;
 use App\Http\Middleware\Activity\ServerSubject;
 use App\Models\Server;
 use Filament\Actions\Action;
@@ -19,7 +19,7 @@ class ServerPanelProvider extends PanelProvider
             ->id('server')
             ->path('server')
             ->homeUrl(fn () => Filament::getPanel('app')->getUrl())
-            ->tenant(Server::class)
+            ->tenant(Server::class, 'uuid_short')
             ->userMenuItems([
                 Action::make('to_serverList')
                     ->label(trans('profile.server_list'))
@@ -29,12 +29,12 @@ class ServerPanelProvider extends PanelProvider
                     ->label(trans('profile.admin'))
                     ->icon('tabler-arrow-forward')
                     ->url(fn () => Filament::getPanel('admin')->getUrl())
-                    ->visible(fn () => auth()->user()->canAccessPanel(Filament::getPanel('admin'))),
+                    ->visible(fn () => user()?->canAccessPanel(Filament::getPanel('admin'))),
             ])
             ->navigationItems([
                 NavigationItem::make(trans('server/console.open_in_admin'))
                     ->url(fn () => EditServer::getUrl(['record' => Filament::getTenant()], panel: 'admin'))
-                    ->visible(fn () => auth()->user()->canAccessPanel(Filament::getPanel('admin')) && auth()->user()->can('view server', Filament::getTenant()))
+                    ->visible(fn () => user()?->canAccessPanel(Filament::getPanel('admin')) && user()->can('view server', Filament::getTenant()))
                     ->icon('tabler-arrow-back')
                     ->sort(99),
             ])

@@ -2,14 +2,14 @@
 
 namespace App\Services\Servers;
 
-use Throwable;
-use Illuminate\Support\Arr;
 use App\Models\Egg;
-use App\Models\User;
 use App\Models\Server;
 use App\Models\ServerVariable;
-use Illuminate\Database\ConnectionInterface;
+use App\Models\User;
 use App\Traits\Services\HasUserLevels;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Arr;
+use Throwable;
 
 class StartupModificationService
 {
@@ -85,8 +85,8 @@ class StartupModificationService
             ]);
 
             // Fill missing fields from egg
-            $data['docker_image'] = $data['docker_image'] ?? collect($egg->docker_images)->first();
-            $data['startup'] = $data['startup'] ?? $egg->startup;
+            $data['docker_image'] ??= Arr::first($egg->docker_images);
+            $data['startup'] ??= Arr::first($egg->startup_commands);
         }
 
         $server->fill([

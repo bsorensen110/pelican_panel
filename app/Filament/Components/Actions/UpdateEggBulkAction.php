@@ -6,8 +6,8 @@ use App\Models\Egg;
 use App\Services\Eggs\Sharing\EggImporterService;
 use Exception;
 use Filament\Actions\Action;
-use Filament\Notifications\Notification;
 use Filament\Actions\BulkAction;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
 
 class UpdateEggBulkAction extends BulkAction
@@ -73,7 +73,7 @@ class UpdateEggBulkAction extends BulkAction
                 ->send();
         });
 
-        $this->authorize(fn () => auth()->user()->can('import egg'));
+        $this->authorize(fn () => user()?->can('import egg'));
 
         $this->deselectRecordsAfterCompletion();
     }

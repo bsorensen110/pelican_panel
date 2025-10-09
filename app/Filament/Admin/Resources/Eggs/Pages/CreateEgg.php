@@ -2,12 +2,12 @@
 
 namespace App\Filament\Admin\Resources\Eggs\Pages;
 
-use Exception;
 use App\Filament\Admin\Resources\Eggs\EggResource;
 use App\Filament\Components\Forms\Fields\CopyFrom;
 use App\Models\EggVariable;
 use App\Traits\Filament\CanCustomizeHeaderActions;
 use App\Traits\Filament\CanCustomizeHeaderWidgets;
+use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Checkbox;
@@ -26,10 +26,10 @@ use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Unique;
-use Filament\Schemas\Schema;
 
 class CreateEgg extends CreateRecord
 {
@@ -83,14 +83,16 @@ class CreateEgg extends CreateRecord
                                 ->rows(2)
                                 ->columnSpanFull()
                                 ->helperText(trans('admin/egg.description_help')),
-                            Textarea::make('startup')
-                                ->label(trans('admin/egg.startup'))
-                                ->rows(3)
+                            KeyValue::make('startup_commands')
+                                ->label(trans('admin/egg.startup_commands'))
+                                ->live()
                                 ->columnSpanFull()
                                 ->required()
-                                ->placeholder(implode("\n", [
-                                    'java -Xms128M -XX:MaxRAMPercentage=95.0 -jar {{SERVER_JARFILE}}',
-                                ]))
+                                ->addActionLabel(trans('admin/egg.add_startup'))
+                                ->keyLabel(trans('admin/egg.startup_name'))
+                                ->keyPlaceholder('Default')
+                                ->valueLabel(trans('admin/egg.startup_command'))
+                                ->valuePlaceholder('java -Xms128M -XX:MaxRAMPercentage=95.0 -jar {{SERVER_JARFILE}}')
                                 ->helperText(trans('admin/egg.startup_help')),
                             TagsInput::make('file_denylist')
                                 ->label(trans('admin/egg.file_denylist'))

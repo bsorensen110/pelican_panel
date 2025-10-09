@@ -14,7 +14,6 @@ use App\Models\Allocation;
 use App\Models\Egg;
 use App\Models\Node;
 use App\Models\Server;
-use App\Models\ServerVariable;
 use App\Models\User;
 use App\Repositories\Daemon\DaemonServerRepository;
 use App\Services\Eggs\EggChangerService;
@@ -34,29 +33,29 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\StateCasts\BooleanStateCast;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\HtmlString;
 use LogicException;
-use Filament\Schemas\Schema;
 use Random\RandomException;
 
 class EditServer extends EditRecord
@@ -179,7 +178,7 @@ class EditServer extends EditRecord
 
                                 TextInput::make('uuid')
                                     ->label(trans('admin/server.uuid'))
-                                    ->copyable(fn () => request()->isSecure())
+                                    ->copyable()
                                     ->columnSpan([
                                         'default' => 2,
                                         'sm' => 1,
@@ -190,7 +189,7 @@ class EditServer extends EditRecord
                                     ->dehydrated(false),
                                 TextInput::make('uuid_short')
                                     ->label(trans('admin/server.short_uuid'))
-                                    ->copyable(fn () => request()->isSecure())
+                                    ->copyable()
                                     ->columnSpan([
                                         'default' => 2,
                                         'sm' => 1,
@@ -211,7 +210,7 @@ class EditServer extends EditRecord
                                     ->maxLength(255),
                                 Select::make('node_id')
                                     ->label(trans('admin/server.node'))
-                                    ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', auth()->user()->accessibleNodes()->pluck('id')))
+                                    ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', user()?->accessibleNodes()->pluck('id')))
                                     ->columnSpan([
                                         'default' => 2,
                                         'sm' => 1,
@@ -610,26 +609,51 @@ class EditServer extends EditRecord
                                         1 => 'tabler-code-off',
                                     ])
                                     ->required(),
+
                                 Hidden::make('previewing')
                                     ->default(false),
-                                Textarea::make('startup')
+
+                                Select::make('select_startup')
                                     ->label(trans('admin/server.startup_cmd'))
-                                    ->required()
-                                    ->columnSpan(6)
-                                    ->autosize()
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set, $state) {
+                                        $set('startup', $state);
+                                        $set('previewing', false);
+                                    })
+                                    ->options(function ($state, Get $get, Set $set) {
+                                        $egg = Egg::find($get('egg_id'));
+                                        $startups = $egg->startup_commands ?? [];
+
+                                        $currentStartup = $get('startup');
+                                        if (!$currentStartup && $startups) {
+                                            $currentStartup = collect($startups)->first();
+                                            $set('startup', $currentStartup);
+                                            $set('select_startup', $currentStartup);
+                                        }
+
+                                        return array_flip($startups) + ['' => 'Custom Startup'];
+                                    })
+                                    ->selectablePlaceholder(false)
+                                    ->columnSpanFull()
                                     ->hintAction(PreviewStartupAction::make('preview')),
 
-                                Textarea::make('defaultStartup')
-                                    ->hintCopy()
-                                    ->label(trans('admin/server.default_startup'))
-                                    ->disabled()
+                                Textarea::make('startup')
+                                    ->hiddenLabel()
+                                    ->required()
+                                    ->live()
                                     ->autosize()
-                                    ->columnSpan(6)
-                                    ->formatStateUsing(function ($state, Get $get) {
-                                        $egg = Egg::query()->find($get('egg_id'));
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        $egg = Egg::find($get('egg_id'));
+                                        $startups = $egg->startup_commands ?? [];
 
-                                        return $egg->startup;
-                                    }),
+                                        if (in_array($state, $startups)) {
+                                            $set('select_startup', $state);
+                                        } else {
+                                            $set('select_startup', '');
+                                        }
+                                    })
+                                    ->placeholder(trans('admin/server.startup_placeholder'))
+                                    ->columnSpanFull(),
 
                                 Repeater::make('server_variables')
                                     ->hiddenLabel()
@@ -637,14 +661,7 @@ class EditServer extends EditRecord
                                         /** @var Server $server */
                                         $server = $this->getRecord();
 
-                                        foreach ($server->variables as $variable) {
-                                            ServerVariable::query()->firstOrCreate([
-                                                'server_id' => $server->id,
-                                                'variable_id' => $variable->id,
-                                            ], [
-                                                'variable_value' => $variable->server_value ?? '',
-                                            ]);
-                                        }
+                                        $server->ensureVariablesExist();
 
                                         return $query->orderByPowerJoins('variable.sort');
                                     })
@@ -924,7 +941,7 @@ class EditServer extends EditRecord
                     }
                 })
                 ->hidden(fn () => $canForceDelete)
-                ->authorize(fn (Server $server) => auth()->user()->can('delete server', $server)),
+                ->authorize(fn (Server $server) => user()?->can('delete server', $server)),
             Action::make('ForceDelete')
                 ->color('danger')
                 ->label(trans('filament-actions::force-delete.single.label'))
@@ -941,7 +958,7 @@ class EditServer extends EditRecord
                     }
                 })
                 ->visible(fn () => $canForceDelete)
-                ->authorize(fn (Server $server) => auth()->user()->can('delete server', $server)),
+                ->authorize(fn (Server $server) => user()?->can('delete server', $server)),
             Action::make('console')
                 ->label(trans('admin/server.console'))
                 ->icon('tabler-terminal')

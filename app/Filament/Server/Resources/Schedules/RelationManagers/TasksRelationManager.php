@@ -6,20 +6,20 @@ use App\Facades\Activity;
 use App\Models\Schedule;
 use App\Models\Task;
 use Exception;
-use Filament\Forms\Components\Field;
+use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Actions\EditAction;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Tables\Table;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Actions\CreateAction;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class TasksRelationManager extends RelationManager
 {
@@ -72,12 +72,12 @@ class TasksRelationManager extends RelationManager
                 ->default('restart'),
             TextInput::make('time_offset')
                 ->label(trans('server/schedule.tasks.time_offset'))
-                ->hidden(fn (Get $get) => config('queue.default') === 'sync' || $get('sequence_id') === 1)
+                ->hidden(fn (Get $get) => config('queue.default') === 'sync' || $get('sequence_id') === 1 || $schedule->tasks->isEmpty())
                 ->default(0)
                 ->numeric()
                 ->minValue(0)
                 ->maxValue(900)
-                ->suffix(trans('server/schedule.tasks.seconds')),
+                ->suffix(trans_choice('server/schedule.tasks.seconds', 2)),
             Toggle::make('continue_on_failure')
                 ->label(trans('server/schedule.tasks.continue_on_failure')),
         ];
@@ -108,7 +108,9 @@ class TasksRelationManager extends RelationManager
                 TextColumn::make('time_offset')
                     ->label(trans('server/schedule.tasks.time_offset'))
                     ->hidden(fn () => config('queue.default') === 'sync')
-                    ->suffix(' '. trans('server/schedule.tasks.seconds')),
+                    ->suffix(fn (Task $task) => $task->sequence_id > 1 ? ' '. trans_choice('server/schedule.tasks.seconds', $task->time_offset) : null)
+                    ->state(fn (Task $task) => $task->sequence_id === 1 ? null : $task->time_offset)
+                    ->placeholder(trans('server/schedule.tasks.first_task')),
                 IconColumn::make('continue_on_failure')
                     ->label(trans('server/schedule.tasks.continue_on_failure'))
                     ->boolean(),
