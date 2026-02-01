@@ -110,7 +110,7 @@ class Node extends Model implements Validatable
         'daemon_listen' => ['required', 'numeric', 'between:1,65535'],
         'daemon_connect' => ['required', 'numeric', 'between:1,65535'],
         'maintenance_mode' => ['boolean'],
-        'upload_size' => ['int', 'between:1,1024'],
+        'upload_size' => ['int', 'min:1'],
         'tags' => ['array'],
     ];
 
@@ -314,7 +314,7 @@ class Node extends Model implements Validatable
     /** @return array<mixed> */
     public function systemInformation(): array
     {
-        return once(function () {
+        return cache()->remember("nodes.$this->id.system_information", now()->addSeconds(360), function () {
             try {
                 return (new DaemonSystemRepository())
                     ->setNode($this)
@@ -358,21 +358,23 @@ class Node extends Model implements Validatable
             'disk_used' => 0,
         ];
 
-        try {
+        return cache()->remember("nodes.$this->id.statistics", now()->addSeconds(360), function () use ($default) {
+            try {
 
-            $data = Http::daemon($this)
-                ->connectTimeout(1)
-                ->timeout(1)
-                ->get('/api/system/utilization')
-                ->json();
+                $data = Http::daemon($this)
+                    ->connectTimeout(1)
+                    ->timeout(1)
+                    ->get('/api/system/utilization')
+                    ->json();
 
-            if ($data['memory_total']) {
-                return $data;
+                if (!empty($data['memory_total'])) {
+                    return $data;
+                }
+            } catch (Exception) {
             }
-        } catch (Exception) {
-        }
 
-        return $default;
+            return $default;
+        });
     }
 
     /** @return string[] */

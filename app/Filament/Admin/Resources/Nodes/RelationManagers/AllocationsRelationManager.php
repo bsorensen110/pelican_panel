@@ -2,11 +2,13 @@
 
 namespace App\Filament\Admin\Resources\Nodes\RelationManagers;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Servers\Pages\CreateServer;
 use App\Filament\Components\Actions\UpdateNodeAllocations;
 use App\Models\Allocation;
 use App\Models\Node;
 use App\Services\Allocations\AssignmentService;
+use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteBulkAction;
@@ -28,7 +30,7 @@ class AllocationsRelationManager extends RelationManager
 {
     protected static string $relationship = 'allocations';
 
-    protected static string|\BackedEnum|null $icon = 'tabler-plug-connected';
+    protected static string|BackedEnum|null $icon = TablerIcon::PlugConnected;
 
     public function setTitle(): string
     {
@@ -56,7 +58,7 @@ class AllocationsRelationManager extends RelationManager
                     ->label(trans('admin/node.ports')),
                 TextColumn::make('server.name')
                     ->label(trans('admin/node.table.servers'))
-                    ->icon('tabler-brand-docker')
+                    ->icon(TablerIcon::BrandDocker)
                     ->visibleFrom('md')
                     ->searchable()
                     ->url(fn (Allocation $allocation): string => $allocation->server ? route('filament.admin.resources.servers.edit', ['record' => $allocation->server]) : ''),
@@ -85,7 +87,8 @@ class AllocationsRelationManager extends RelationManager
                 DeleteBulkAction::make()
                     ->authorize(fn () => user()?->can('update', $this->getOwnerRecord())),
                 Action::make('create new allocation')
-                    ->label(trans('admin/node.create_allocation'))
+                    ->tooltip(trans('admin/node.create_allocation'))
+                    ->icon(TablerIcon::WorldPlus)
                     ->schema(fn () => [
                         Select::make('allocation_ip')
                             ->options(fn () => collect($this->getOwnerRecord()->ipAddresses())->mapWithKeys(fn (string $ip) => [$ip => $ip]))
@@ -96,9 +99,8 @@ class AllocationsRelationManager extends RelationManager
                             ->afterStateUpdated(fn (Set $set) => $set('allocation_ports', []))
                             ->live()
                             ->hintAction(
-                                Action::make('refresh')
-                                    ->iconButton()
-                                    ->icon('tabler-refresh')
+                                Action::make('hint_refresh')
+                                    ->icon(TablerIcon::Refresh)
                                     ->tooltip(trans('admin/node.refresh'))
                                     ->action(function () {
                                         cache()->forget("nodes.{$this->getOwnerRecord()->id}.ips");
